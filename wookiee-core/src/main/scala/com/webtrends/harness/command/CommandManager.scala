@@ -7,6 +7,7 @@ import akka.util.Timeout
 import com.webtrends.harness.HarnessConstants
 import com.webtrends.harness.app.HarnessActor.SystemReady
 import com.webtrends.harness.app.PrepareForShutdown
+import com.webtrends.harness.command.v2.CommandRegister
 
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
@@ -18,6 +19,8 @@ import scala.util.{Failure, Success}
   */
 case class AddCommandWithProps(name: String, props: Props, checkHealth: Boolean = false)
 case class AddCommand[T: ClassTag](name: String, actorClass: Class[T], checkHealth: Boolean = false)
+case class AddCommandV2[Input <: Any : ClassTag, Output <: Any : ClassTag](
+           config: CommandRegister[Input, Output], id: String, unmarshal: Any => Input, command: Input => Output)
 case class ExecuteCommand[Input <: Product : ClassTag](name: String, bean: Input, timeout: Timeout)
 case class ExecuteRemoteCommand[Input <: Product : ClassTag](name: String, server: String, port: Int, bean: Input, timeout: Timeout)
 case class GetCommands()
@@ -27,6 +30,7 @@ class CommandManager extends PrepareForShutdown {
 
   // map that stores the name of the command with the actor it references
   val commandMap: mutable.Map[String, ActorRef] = mutable.Map[String, ActorRef]()
+  val commandMapV2: mutable.Map[String, AddCommandV2[Any, Any]] = mutable.Map[String, AddCommandV2[Any, Any]]()
   val healthCheckChildren: mutable.ArrayBuffer[ActorRef] = mutable.ArrayBuffer.empty[ActorRef]
 
   /** Only check the health of commands that have specified that they are going to provide health information
@@ -41,6 +45,10 @@ class CommandManager extends PrepareForShutdown {
       pipe(addCommand(name, props, checkHealth)) to sender
     case AddCommand(name, actorClass, checkHealth) =>
       pipe(addCommand(name, actorClass, checkHealth)) to sender
+    case av2: AddCommandV2[Any, Any] =>
+      // TODO Error handling
+      av2.config.register(av2.id, av2.unmarshal, av2.command)
+      commandMapV2.update(av2.id, av2)
     case ExecuteCommand(name, bean, timeout) =>
       pipe(executeCommand(name, bean, timeout)) to sender
     case ExecuteRemoteCommand(name, server, port, bean, timeout) =>

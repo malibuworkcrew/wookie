@@ -27,3 +27,7 @@ class WeatherCommand extends Command[WeatherData, String] with WeatherForecast {
     }
   }
 }
+
+object WeatherCommand {
+  val CommandName = "weather"
+}

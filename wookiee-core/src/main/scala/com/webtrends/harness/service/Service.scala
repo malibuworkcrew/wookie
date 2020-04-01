@@ -18,30 +18,35 @@
  */
 package com.webtrends.harness.service
 
+import akka.actor.ActorContext
 import com.webtrends.harness.app.HActor
 import com.webtrends.harness.app.HarnessActor.ConfigChange
 import com.webtrends.harness.command._
+import com.webtrends.harness.command.v2.CommandHelperV2
 import com.webtrends.harness.component.ComponentHelper
 import com.webtrends.harness.service.messages._
 import com.webtrends.harness.service.meta.{ServiceMetaData, ServiceMetaDetails}
 
+import scala.concurrent.ExecutionContextExecutor
+
 trait Service extends HActor
     with CommandHelper
-    with ComponentHelper {
+    with ComponentHelper
+    with CommandHelperV2 {
 
-  implicit val executor = context.dispatcher
+  implicit val executor: ExecutionContextExecutor = context.dispatcher
 
-  def actorRefFactory = context
+  def actorRefFactory: ActorContext = context
 
   // To be defined in service actor, be sure to route through super.serviceRecieve like so:
   //
-  def serviceReceive = {
+  def serviceReceive: Receive = {
     case GetMetaDetails => sender ! getMetaDetails()
     case Ready(meta) => ready(meta) // Meta info received
   }: Receive
 
   override def preStart() {
-    initCommandHelper
+    initCommandHelper()
     initComponentHelper
     log.info("The service {} started", serviceName)
   }
@@ -58,7 +63,7 @@ trait Service extends HActor
   def serviceName : String = this.getClass.getSimpleName
 
   // Combine the services receive along with any optional routes
-  override def receive = super.receive orElse ({
+  override def receive: Receive = super.receive orElse ({
     case Ping =>
       sender() ! Pong
 

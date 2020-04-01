@@ -35,8 +35,14 @@ import scala.util.{Failure, Success}
  *
  * @author Michael Cuthbert on 12/10/14.
  */
+object CommandHelper {
+  def getCommandManager(system: ActorSystem, timeout: Timeout = 2 seconds): Future[ActorRef] = {
+    system.actorSelection(HarnessConstants.CommandFullName).resolveOne()(timeout)
+  }
+}
+
 trait CommandHelper  { this: Actor =>
-  import scala.concurrent.ExecutionContext.Implicits.global
+  import context.dispatcher
 
   lazy implicit val actorSystem: ActorSystem = context.system
 
@@ -52,12 +58,13 @@ trait CommandHelper  { this: Actor =>
     if (commandManagerInitialized) {
       p success commandManagerInitialized
     } else {
-      actorSystem.actorSelection(HarnessConstants.CommandFullName).resolveOne()(2 seconds) onComplete {
+      CommandHelper.getCommandManager(actorSystem) onComplete {
         case Success(s) =>
           commandManagerInitialized = true
           commandManager = Some(s)
           p success commandManagerInitialized
-        case Failure(f) => p failure CommandException("Component Manager", f)
+        case Failure(f) =>
+          p failure CommandException("Component Manager", f)
       }
     }
     p.future
@@ -129,7 +136,7 @@ trait CommandHelper  { this: Actor =>
    * @param port The port of the remote server defaults to 0, as by default this function deals with local commands
    * @return
    */
-  def executeCommand[Input<: Product : ClassTag, Output <: Any : ClassTag](name:String, bean: Input, server:Option[String]=None,
+  def executeCommand[Input<: Product : ClassTag, Output <: Any : ClassTag](name: String, bean: Input, server:Option[String]=None,
                                                             port:Int=2552)(implicit timeout:Timeout) : Future[Output] = {
     val p = Promise[Output]
     initCommandManager onComplete {

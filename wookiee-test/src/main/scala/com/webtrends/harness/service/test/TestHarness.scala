@@ -61,6 +61,7 @@ object TestHarness {
     harness
   }
 
+  def get(port: Int = DEFAULT_PORT): Option[TestHarness] = harnessMap.get(port)
   def system(port: Int = DEFAULT_PORT): Option[ActorSystem] = Harness.getActorSystem(port)
   def log: Logger = Harness.getLogger
   def rootActor(port: Int = DEFAULT_PORT): Option[ActorRef] = Harness.getRootActor(port)
